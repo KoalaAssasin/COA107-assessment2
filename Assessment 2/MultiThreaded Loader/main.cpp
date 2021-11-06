@@ -2,9 +2,12 @@
 #include <Windows.h>
 #include <vector>
 #include <string>
+#include <thread>
+#include <iostream>
+#include <fstream>
+#include <mutex>
+#include <string>
 #include "resource.h"
-
-
 
 #define WINDOW_CLASS_NAME L"MultiThreaded Loader Tool"
 const unsigned int _kuiWINDOWWIDTH = 1200;
@@ -20,8 +23,9 @@ bool g_bIsFileLoaded = false;
 
 HBITMAP LoaderFile;
 
-int xPos = 100;
-int yPos = 100;
+unsigned int xPos = 0;
+unsigned int yPos = 0;
+
 
 bool ChooseImageFilesToLoad(HWND _hwnd)
 {
@@ -150,7 +154,7 @@ bool ChooseSoundFilesToLoad(HWND _hwnd)
 
 void ImageLoad(int ImageNo)
 {
-	LoaderFile = (HBITMAP)LoadImageW(NULL, (LPCWSTR)g_vecImageFileNames[ImageNo].c_str(), IMAGE_BITMAP, 100, 100, LR_LOADFROMFILE);
+	LoaderFile = (HBITMAP)LoadImageW(NULL, (LPCWSTR)g_vecImageFileNames[ImageNo].c_str(), IMAGE_BITMAP, 250, 100, LR_LOADFROMFILE);
 }
 
 void Controller(HWND wnd, int ImageNo)
@@ -161,7 +165,7 @@ void Controller(HWND wnd, int ImageNo)
 	}
 	else
 	{
-		xPos = ImageNo * 100;
+		xPos = ImageNo * 250;
 	}
 	if (xPos >= _kuiWINDOWWIDTH)
 	{
@@ -216,11 +220,27 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 			if (ChooseImageFilesToLoad(_hwnd))
 			{
 				//Write code here to create multiple threads to load image files in parallel
+				auto startTime = std::chrono::steady_clock::now();
+
 				for (unsigned int i = 0; g_vecImageFileNames.size() > i ; i++)
 				{
 					ImageLoad(i);
 					Controller(_hwnd, i);
 				}
+
+				auto endTime = std::chrono::steady_clock::now();
+				std::chrono::duration<double> elapsed_seconds = endTime - startTime;
+
+				std::string temp = std::to_string(elapsed_seconds.count());
+
+				//converting string to wstring
+				std::wstring str2(temp.length(), L' '); 
+				std::copy(temp.begin(), temp.end(), str2.begin());
+
+				//Displaying time taken to load and display images
+				MessageBox(_hwnd, (L"Seconds taken: " + str2).c_str(), L"Load and display time", MB_OK | NULL);
+
+
 			}
 			else
 			{
