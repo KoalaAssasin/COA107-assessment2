@@ -23,9 +23,8 @@ bool g_bIsFileLoaded = false;
 
 HBITMAP LoaderFile;
 
-unsigned int xPos = 0;
-unsigned int yPos = 0;
-
+std::mutex dataLock;
+int numberFromFile;
 
 bool ChooseImageFilesToLoad(HWND _hwnd)
 {
@@ -154,18 +153,21 @@ bool ChooseSoundFilesToLoad(HWND _hwnd)
 
 void ImageLoad(int ImageNo)
 {
-	LoaderFile = (HBITMAP)LoadImageW(NULL, (LPCWSTR)g_vecImageFileNames[ImageNo].c_str(), IMAGE_BITMAP, 250, 100, LR_LOADFROMFILE);
+	LoaderFile = (HBITMAP)LoadImageW(NULL, (LPCWSTR)g_vecImageFileNames[ImageNo].c_str(), IMAGE_BITMAP, 220, 100, LR_LOADFROMFILE);
 }
 
 void Controller(HWND wnd, int ImageNo)
 {
+	int xPos = 0;
+	int yPos = 0;
+
 	if (yPos > 0)
 	{
 		xPos = ((ImageNo - 8) * 100);
 	}
 	else
 	{
-		xPos = ImageNo * 250;
+		xPos = ImageNo * 220;
 	}
 	if (xPos >= _kuiWINDOWWIDTH)
 	{
@@ -175,7 +177,6 @@ void Controller(HWND wnd, int ImageNo)
 	wnd = CreateWindow(L"STATIC", NULL, WS_VISIBLE | WS_CHILD | SS_BITMAP, xPos, yPos, 0, 0, wnd, NULL, NULL, NULL);
 	SendMessageW(wnd, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)LoaderFile);
 }
-
 
 LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lparam)
 {
@@ -219,27 +220,36 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		{
 			if (ChooseImageFilesToLoad(_hwnd))
 			{
+
 				//Write code here to create multiple threads to load image files in parallel
+
+				//Thread amount if read from file in the winmain function
+				const int threadAmount = numberFromFile;
+
+				//Making threads based on amount of threads in file
+				std::thread* theThreads = new std::thread[threadAmount];
+
 				auto startTime = std::chrono::steady_clock::now();
 
 				for (unsigned int i = 0; g_vecImageFileNames.size() > i ; i++)
 				{
-					ImageLoad(i);
+					*theThreads = std::thread(ImageLoad, i);
+					theThreads->join();
+
 					Controller(_hwnd, i);
+
 				}
 
 				auto endTime = std::chrono::steady_clock::now();
 				std::chrono::duration<double> elapsed_seconds = endTime - startTime;
 
+				//converting double to string to wstring so time can be displayed in the message box
 				std::string temp = std::to_string(elapsed_seconds.count());
-
-				//converting string to wstring
 				std::wstring str2(temp.length(), L' '); 
 				std::copy(temp.begin(), temp.end(), str2.begin());
 
 				//Displaying time taken to load and display images
 				MessageBox(_hwnd, (L"Seconds taken: " + str2).c_str(), L"Load and display time", MB_OK | NULL);
-
 
 			}
 			else
@@ -347,6 +357,10 @@ int WINAPI WinMain(HINSTANCE _hInstance,
 		return (0);
 	}
 
+	//Reading thread amount from file
+	std::fstream myFile;
+	myFile.open("testFile.txt", std::ios::in);
+	myFile >> numberFromFile;
 
 	// Enter main event loop
 	while (true)
@@ -368,7 +382,9 @@ int WINAPI WinMain(HINSTANCE _hInstance,
 
 	}
 
+	myFile.close();
+
 	// Return to Windows like this...
 	return (static_cast<int>(msg.wParam));
-}
 
+}
